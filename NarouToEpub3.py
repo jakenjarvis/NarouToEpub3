@@ -144,7 +144,7 @@ class ScrapingNcode():
       if item.isSubtitle():
         item.scrapingChapterItem = ScrapingChapterItem(item)
       # 連続アクセスの自制
-      time.sleep(0.5)
+      time.sleep(0.6)
 
 class ScrapingChapterItem():
   def __init__(self, chapterItem):
