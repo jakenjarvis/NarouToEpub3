@@ -29,6 +29,12 @@ from lxml.builder import E
 
 from ebooklib import epub
 
+# https://qiita.com/YuukiMiyoshi/items/6ce77bf402a29a99f1bf
+ZEN = re.sub(r"[ａ-ｚＡ-Ｚ０-９]", r'', "".join(chr(0xff01 + i) for i in range(94)))
+HAN = re.sub(r"[a-zA-Z0-9]", r'', "".join(chr(0x21 + i) for i in range(94)))
+ZEN2HAN = str.maketrans(ZEN, HAN)
+HAN2ZEN = str.maketrans(HAN, ZEN)
+
 def USER_AGENT():
   return "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_6)" \
         "AppleWebKit/537.36 (KHTML, like Gecko)" \
@@ -316,7 +322,7 @@ class NarouToEpub3():
 
     #出力ファイル名
     currentPath = os.path.dirname(os.path.abspath(__file__))
-    filename = title + "_" + self.ncode.upper() + "_" + datetime.datetime.now().strftime(r'%Y%m%d')
+    filename = title.translate(HAN2ZEN) + "_" + self.ncode.upper() + "_" + datetime.datetime.now().strftime(r'%Y%m%d')
     self.__outputEpubFileName = os.path.join(currentPath, 'output', filename + ".epub")
     print(self.__outputEpubFileName)
 
