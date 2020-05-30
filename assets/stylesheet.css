@@ -1,0 +1,82 @@
+* { line-height: 125%; }
+
+h3 { margin-top: 3em;}
+h4 { margin-top: 3em;}
+h5 { margin-top: 3em;}
+h6 { margin-top: 3em;}
+
+body{
+    writing-mode: vertical-rl;
+    -webkit-writing-mode: vertical-rl;
+    -epub-writing-mode: vertical-rl;
+    text-align: justify;
+    margin:0;
+    padding:0;
+}
+body.vertical {
+    writing-mode: vertical-rl;
+    -webkit-writing-mode: vertical-rl;
+    -epub-writing-mode: vertical-rl;
+}
+body.horizontal{
+    writing-mode:horizontal-tb;
+    -epub-writing-mode:horizontal-tb;
+    -webkit-writing-mode:horizontal-tb;
+}
+
+
+
+span.tny {
+  writing-mode: horizontal-tb;
+  -epub-writing-mode: horizontal-tb;
+  -webkit-writing-mode: horizontal-tb;
+}
+span.tny2 {
+  text-combine: horizontal;
+  -epub-text-combine: horizontal;
+  -webkit-text-combine: horizontal;
+}
+span.emph {
+  text-emphasis-style: dot;
+  -epub-text-emphasis-style: dot;
+  -webkit-text-emphasis-style: dot;
+}
+
+
+th, td { padding: 0.1em 0.2em; background: lightgrey; }
+th { white-space: nowrap; }
+.tcy {
+  letter-spacing:-0.1ex;
+  text-combine: horizontal;
+  -webkit-text-combine: horizontal;
+  -epub-text-combine: horizontal;
+}
+
+img{
+    max-width:100%;
+    max-height:100%;
+}
+
+
+.smhsm {
+  letter-spacing:-0.5ex;
+  text-combine: horizontal;
+  -webkit-text-combine: horizontal;
+  -moz-text-combine: horizontal;
+  -ms-text-combine: horizontal;
+}
+.pagebreak {
+  page-break-after: always;
+}
+.pagebreak-before {
+  page-break-before: always;
+}
+.pagebreak-both {
+  page-break-before: always;
+  page-break-after: always;
+}
+hr.pagebreak {
+  border: 0;
+  height: 0;
+  visibility: hidden;
+}
