@@ -407,7 +407,7 @@ class NarouToEpub3():
     self.__manager.commitPage(page)
 
   def editContentText(self, text):
-    content = text
+    content = self.html_escape(text)
     # 改行置換
     content = re.sub(r"(\r\n|\r|\n)", r"<br />", content)
     # URLリンク
@@ -418,6 +418,22 @@ class NarouToEpub3():
     content = r'<p>' + content + r'</p>'
     element = lxml.etree.fromstring(content)
     return element
+
+  # html.escape
+  def html_escape(self, s, quote=True):
+    """
+    Replace special characters "&", "<" and ">" to HTML-safe sequences.
+    If the optional flag quote is true (the default), the quotation mark
+    characters, both double quote (") and single quote (') characters are also
+    translated.
+    """
+    s = s.replace("&", "&amp;") # Must be done first!
+    s = s.replace("<", "&lt;")
+    s = s.replace(">", "&gt;")
+    if quote:
+        s = s.replace('"', "&quot;")
+        s = s.replace('\'', "&#x27;")
+    return s
 
 if __name__ == '__main__':
     currentPath = os.path.dirname(os.path.abspath(__file__))
