@@ -110,7 +110,12 @@ class ScrapingNcode():
     self.novel_title = str(self.__root.xpath(r"//p[@class='novel_title']")[0].text)
     print(self.novel_title)
 
-    self.novel_writername = str(self.__root.xpath(r"//*[@class='novel_writername']/a")[0].text)
+    self.novel_writername = ""
+    find_novel_writername_a = self.__root.xpath(r"//*[@class='novel_writername']/a")
+    if len(find_novel_writername_a) >= 1:
+      self.novel_writername = str(self.__root.xpath(r"//*[@class='novel_writername']/a")[0].text)
+    else:
+      self.novel_writername = str(self.__root.xpath(r"//*[@class='novel_writername']")[0].text_content()).replace("作者：","")
     print(self.novel_writername)
 
     self.novel_ex = self.__root.xpath(r"//div[@id='novel_ex']")[0].text_content()
