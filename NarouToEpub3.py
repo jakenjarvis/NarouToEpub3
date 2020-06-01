@@ -292,20 +292,11 @@ class BookManager():
     epub.write_epub(self.outputEpubFileName, self.book, {})
 
 class NarouToEpub3():
-  def __init__(self, debug=False):
-    parser = ArgumentParser(description=r"EPUB3になろう")
-    parser.add_argument("-n", "--ncode", type=str, help="N-code", required=True)
+  def __init__(self, ncode):
+    if not re.match(r"n[0-9]{4,}[a-z]{1,}", ncode):
+      raise Exception(r"The ncode entered is invalid: " + ncode)
 
-    if debug:
-      #self.ncode = "n2267be"
-      #self.ncode = "n4750dy"
-      self.ncode = "n4966ek"
-    else:
-      self.args = parser.parse_args()
-      self.ncode = self.args.ncode.lower()
-      if not re.match(r"n[0-9]{4,}[a-z]{1,}", self.ncode):
-        raise Exception(r"The ncode entered is invalid.")
-
+    self.ncode = ncode
     self.__createDate = datetime.datetime.now()
 
     # なろうスクレイピング
@@ -446,4 +437,14 @@ if __name__ == '__main__':
     os.chdir(currentPath)
     print(os.getcwd())
 
-    NarouToEpub3(False)
+    parser = ArgumentParser(description=r"EPUB3になろう")
+    parser.add_argument("-n", "--ncode", type=str, help="N-code", required=True)
+
+    args = parser.parse_args()
+    ncode = args.ncode.lower()
+
+    #ncode = "n2267be"
+    #ncode = "n4750dy"
+    #ncode = "n4966ek"
+
+    NarouToEpub3(ncode)
