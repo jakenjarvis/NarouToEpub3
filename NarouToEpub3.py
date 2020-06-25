@@ -5,10 +5,8 @@
 #   NarouToEpub3.py
 # 2020/05/30 Jaken
 #
-# TODO: ページ内の行別処理
-#       ⇒ ルビの処理
+# TODO:
 #       ⇒ リンクの処理
-#       ⇒ 埋め込み画像の処理（ダウンロード処理が必要）
 #
 # TODO: 章の階層構造化。ebooklibでの実現方法が分からない。
 # TODO: 複数ncode連続実行対応
@@ -218,6 +216,13 @@ class TextFileManager():
       result = file.read()
     return result
 
+class ImageObject():
+  def __init__(self, subtitle_index, number, file_name=''):
+    # epub.EpubItem() param
+    self.uid = r"image_" + str(subtitle_index) + r"_" + str(number).zfill(3)
+    self.file_name = file_name
+    self.relativePath = r"images/" + os.path.basename(file_name)
+
 class PageObject():
   def __init__(self, uid=None, file_name='', media_type='', content=None, title='', lang=None, direction=None, media_overlay=None, media_duration=None):
     # epub.EpubHtml() param
@@ -231,12 +236,22 @@ class PageObject():
     self.media_overlay = media_overlay
     self.media_duration = media_duration
 
-    self.document_root = E.html(E.head(), E.body())
+    self.__objectImagesNumber = 0
+    self.objectImages = []
 
+    self.document_root = E.html(E.head(), E.body())
     self.__document_body = self.document_root.xpath(r"//body")[0]
 
   def appendBody(self, element):
     self.__document_body.append(element)
+
+  def createImageObject(self, file_name):
+    imageObject = ImageObject(self.uid, self.__objectImagesNumber, file_name)
+    self.__objectImagesNumber += 1
+    return imageObject
+
+  def appendImageObject(self, imageObject):
+    self.objectImages.append(imageObject)
 
 class BookManager():
   def __init__(self, identifier, title, contributor):
@@ -276,6 +291,13 @@ class BookManager():
     c.add_item(self.default_css)
     self.book.add_item(c)
     self.tocs.append(c)
+
+    # 画像ファイルの差し込み
+    for imageObject in pageObject.objectImages:
+      image_item = epub.EpubItem(uid=imageObject.uid, file_name=imageObject.relativePath)
+      with open(imageObject.file_name, 'rb') as f:
+          image_item.content = f.read()
+      self.book.add_item(image_item)
 
   def commitBook(self, outputEpubFileName):
     self.outputEpubFileName = outputEpubFileName
@@ -317,6 +339,9 @@ class NarouToEpub3():
     self.__outputEpubFileName = os.path.join(currentPath, 'output', filename + ".epub")
     print(self.__outputEpubFileName)
 
+    # ダウンロード ベースパス
+    self.__downloadLocalBasePath = os.path.join(currentPath, 'download', self.ncode)
+
     # Book作成開始
     self.__manager = BookManager(identifier, title, contributor)
 
@@ -334,9 +359,9 @@ class NarouToEpub3():
           self.createChapterPageWithText(item.subtitle_index, "p", item.subtitle_text + r"【前書き】", item.scrapingChapterItem.novel_p)
 
         # 本文
-        #self.createChapterPageWithElements(item.subtitle_index, "h", item.subtitle_text, item.scrapingChapterItem.novel_honbun)
         if item.scrapingChapterItem.novel_h:
-          self.createChapterPageWithText(item.subtitle_index, "h", item.subtitle_text, item.scrapingChapterItem.novel_h)
+          #self.createChapterPageWithText(item.subtitle_index, "h", item.subtitle_text, item.scrapingChapterItem.novel_h)
+          self.createChapterPageWithElements(item.subtitle_index, "h", item.subtitle_text, item.scrapingChapterItem.novel_honbun)
 
         # 後書き
         if item.scrapingChapterItem.novel_a:
@@ -359,8 +384,27 @@ class NarouToEpub3():
     page = PageObject(uid=uid, file_name=uid + '.xhtml', title=title, lang='ja')
     page.appendBody(E.h2(title))
 
-    # TODO: elements
-    page.appendBody(E.p("TEST TEST"))
+    downloadLocalPath = os.path.join(self.__downloadLocalBasePath, str(index))
+    dlm = DownloadManager(downloadLocalPath)
+
+    for element in elements:
+      #print(lxml.etree.tostring(element, pretty_print=True))
+      img_list = element.xpath(r".//img")
+      for img in img_list:
+        imgsrc = str(img.attrib['src'])
+        print(imgsrc)
+
+        # 画像ファイルのダウンロード
+        dlm.download(imgsrc)
+        # 格納用オブジェクトの作成
+        imageObject = page.createImageObject(dlm.localfullPathFileName)
+        # imgタグのsrcをEPUB用のリンク先に入れ替え
+        img.attrib['src'] = imageObject.relativePath
+
+        page.appendImageObject(imageObject)
+
+      # NOTE: rubyやaは無視してそのまま書き込む
+      page.appendBody(element)
 
     self.__manager.commitPage(page)
 
@@ -432,6 +476,78 @@ class NarouToEpub3():
         s = s.replace('\'', "&#x27;")
     return s
 
+class DownloadManager():
+  def __init__(self, downloadLocalPath=None):
+    self.__param_url = None
+    self.__completed_url = None
+    self.__target_url = None
+
+    self.__fileName = None
+    #self.__fileExtension = None
+    self.__downloadLocalPath = None
+    self.__localfullPathFileName = None
+
+    if downloadLocalPath == None:
+        currentPath = os.path.dirname(os.path.abspath(__file__))
+        self.__downloadLocalPath = os.path.join(currentPath, r"download")
+    else:
+        self.__downloadLocalPath = str(downloadLocalPath)
+
+  @property
+  def paramUrl(self):
+    return self.__param_url
+
+  @property
+  def completedUrl(self):
+    return self.__completed_url
+
+  @property
+  def targetUrl(self):
+    return self.__target_url
+
+  @property
+  def fileName(self):
+    return self.__fileName
+
+  @property
+  def localfullPathFileName(self):
+    return self.__localfullPathFileName
+
+  def download(self, url):
+    self.__param_url = url
+
+    if self.__param_url.startswith(('http://', 'https://')):
+      self.__completed_url = self.__param_url
+    elif self.__param_url.startswith('//'):
+      self.__completed_url = 'https:' + self.__param_url
+    else:
+      raise Exception("Invalid URL: " + self.__param_url)
+
+    print("Download   : " + self.__completed_url)
+    response = requests.get(self.__completed_url, headers={"User-Agent": USER_AGENT()}, allow_redirects=True)
+    if response.status_code != 200:
+        raise Exception("HTTP status: " + response.status_code)
+    content_type = response.headers["content-type"]
+    if 'image' not in content_type:
+        raise Exception("Content-Type: " + content_type)
+
+    self.__target_url = str(response.url)
+    print("           : " + self.__target_url)
+    self.__fileName = os.path.basename(self.__target_url)
+    #print("           : " + self.__fileName)
+    #self.__fileExtension = os.path.splitext(self.__target_url)[1]
+    #print("           : " + self.__fileExtension)
+
+    self.__localfullPathFileName = os.path.join(self.__downloadLocalPath, self.__fileName)
+
+    dirPath = os.path.dirname(self.__localfullPathFileName)
+    os.makedirs(dirPath, exist_ok=True)
+    with open(self.__localfullPathFileName, "wb") as fout:
+        fout.write(response.content)
+
+    print("   -> Done : " + self.__localfullPathFileName)
+    return self.__localfullPathFileName
+
 if __name__ == '__main__':
     currentPath = os.path.dirname(os.path.abspath(__file__))
     os.chdir(currentPath)
@@ -447,4 +563,8 @@ if __name__ == '__main__':
     #ncode = "n4750dy"
     #ncode = "n4966ek"
 
+    #ncode = "n4830bu"
+    #ncode = "n7835cj"
+
     NarouToEpub3(ncode)
+
