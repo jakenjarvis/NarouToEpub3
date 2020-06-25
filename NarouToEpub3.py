@@ -25,7 +25,12 @@ import lxml.html
 import lxml.etree
 from lxml.builder import E
 
+import ebooklib
 from ebooklib import epub
+from ebooklib.utils import create_pagebreak
+from collections import OrderedDict
+
+from ebooklib.utils import debug
 
 # https://qiita.com/YuukiMiyoshi/items/6ce77bf402a29a99f1bf
 ZEN = re.sub(r"[ａ-ｚＡ-Ｚ０-９]", r'', "".join(chr(0xff01 + i) for i in range(94)))
@@ -110,6 +115,12 @@ class ScrapingNcode():
 
     response = requests.get(self.url, headers={"User-Agent": USER_AGENT()})
     self.__root = lxml.html.fromstring(response.content)
+
+    self.series_title = ""
+    find_series_title_a = self.__root.xpath(r"//*[@class='series_title']/a")
+    if len(find_series_title_a) >= 1:
+      self.series_title = str(self.__root.xpath(r"//*[@class='series_title']/a")[0].text)
+    print(self.series_title)
 
     self.novel_title = str(self.__root.xpath(r"//p[@class='novel_title']")[0].text)
     print(self.novel_title)
@@ -254,10 +265,11 @@ class PageObject():
     self.objectImages.append(imageObject)
 
 class BookManager():
-  def __init__(self, identifier, title, contributor):
+  def __init__(self, identifier, title, contributor, series_title):
     self.__identifier = identifier
     self.__title = title
     self.__contributor = contributor
+    self.__series_title = series_title
 
     self.book = epub.EpubBook()
     self.book.FOLDER_NAME = r"OEBPS"
@@ -270,6 +282,10 @@ class BookManager():
     self.book.add_metadata('DC', 'contributor', self.__contributor)
     self.book.add_metadata('DC', 'rights', "All rights reserved by the contributor")
     self.book.add_author(self.__contributor)
+
+    if len(self.__series_title) >= 1:
+      self.book.add_metadata(None, 'meta', self.__series_title, OrderedDict([('property', 'belongs-to-collection'), ('id', 'series_id')]))
+      self.book.add_metadata(None, 'meta', r"series", OrderedDict([('refines', 'series_id'), ('property', 'collection-type')]))
 
     self.tocs = []
 
@@ -328,10 +344,12 @@ class NarouToEpub3():
     identifier = "com.tojc.epub3." + self.ncode
     title = self.__scrapingNcode.novel_title
     contributor = self.__scrapingNcode.novel_writername
+    series_title = self.__scrapingNcode.series_title
 
     print(identifier)
     print(title)
     print(contributor)
+    print(series_title)
 
     #出力ファイル名
     currentPath = os.path.dirname(os.path.abspath(__file__))
@@ -343,7 +361,7 @@ class NarouToEpub3():
     self.__downloadLocalBasePath = os.path.join(currentPath, 'download', self.ncode)
 
     # Book作成開始
-    self.__manager = BookManager(identifier, title, contributor)
+    self.__manager = BookManager(identifier, title, contributor, series_title)
 
     # タイトルページ
     self.createTitlePage(self.ncode, title, contributor, self.__createDate)
@@ -567,4 +585,3 @@ if __name__ == '__main__':
     #ncode = "n7835cj"
 
     NarouToEpub3(ncode)
-
