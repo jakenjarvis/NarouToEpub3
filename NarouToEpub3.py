@@ -5,11 +5,7 @@
 #   NarouToEpub3.py
 # 2020/05/30 Jaken
 #
-# TODO:
-#       ⇒ リンクの処理
-#
 # TODO: 章の階層構造化。ebooklibでの実現方法が分からない。
-# TODO: 複数ncode連続実行対応
 #--------------------------------------------------
 import os
 import sys
@@ -572,16 +568,19 @@ if __name__ == '__main__':
     print(os.getcwd())
 
     parser = ArgumentParser(description=r"EPUB3になろう")
-    parser.add_argument("-n", "--ncode", type=str, help="N-code", required=True)
+    parser.add_argument("-n", "--ncode", type=str, help="N-code", nargs='+', required=True)
 
-    args = parser.parse_args()
-    ncode = args.ncode.lower()
+    ncodes = []
+    # for debug
+    #ncodes.append("n2267be")
+    #ncodes.append("n4750dy")
+    #ncodes.append("n4966ek")
+    #ncodes.append("n4830bu")
+    #ncodes.append("n7835cj")
 
-    #ncode = "n2267be"
-    #ncode = "n4750dy"
-    #ncode = "n4966ek"
+    if len(ncodes) == 0:
+      args = parser.parse_args()
+      ncodes = args.ncode
 
-    #ncode = "n4830bu"
-    #ncode = "n7835cj"
-
-    NarouToEpub3(ncode)
+    for ncode in ncodes:
+      NarouToEpub3(ncode.lower())
