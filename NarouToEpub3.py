@@ -285,7 +285,7 @@ class BookManager():
 
     if len(self.__series_title) >= 1:
       self.book.add_metadata(None, 'meta', self.__series_title, OrderedDict([('property', 'belongs-to-collection'), ('id', 'series_id')]))
-      self.book.add_metadata(None, 'meta', r"series", OrderedDict([('refines', 'series_id'), ('property', 'collection-type')]))
+      self.book.add_metadata(None, 'meta', r"series", OrderedDict([('refines', '#series_id'), ('property', 'collection-type')]))
 
     self.tocs = []
 
@@ -327,7 +327,7 @@ class BookManager():
 
     self.book.spine = self.tocs
 
-    epub.write_epub(self.outputEpubFileName, self.book, {})
+    epub.write_epub(self.outputEpubFileName, self.book, {"package_direction" : True})
 
 class NarouToEpub3():
   def __init__(self, ncode):
