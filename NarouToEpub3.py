@@ -309,11 +309,25 @@ class BookManager():
     self.tocs = []
 
     currentPath = os.path.dirname(os.path.abspath(__file__))
+
     css_path = os.path.abspath(os.path.join(currentPath, r"assets/stylesheet.css"))
     style = TextFileManager(css_path).load()
-
     self.default_css = epub.EpubItem(uid="style", file_name="stylesheet.css", media_type="text/css", content=style)
     self.book.add_item(self.default_css)
+
+    cover_css_path = os.path.abspath(os.path.join(currentPath, r"assets/cover.css"))
+    style_cover = TextFileManager(cover_css_path).load()
+    self.cover_css = epub.EpubItem(uid="style_cover", file_name="cover.css", media_type="text/css", content=style_cover)
+    self.book.add_item(self.cover_css)
+
+  def appendCover(self, imageFileName):
+    with open(imageFileName, 'rb') as f:
+        self.book.set_cover(r"cover/cover.png", f.read(), create_page=True)
+    self.tocs.append('cover')
+    # cover.xhtml
+    cover_item = self.book.get_item_with_id("cover")
+    #cover_item.is_linear = True
+    cover_item.add_item(self.cover_css)
 
   def appendNavPage(self):
     # nav (auto generate)
@@ -378,10 +392,14 @@ class NarouToEpub3():
     print(self.__outputEpubFileName)
 
     # ダウンロード ベースパス
-    self.__downloadLocalBasePath = os.path.join(currentPath, 'download', self.ncode)
+    self.__downloadLocalBasePath = os.path.join(currentPath, 'output', 'download', self.ncode)
 
     # Book作成開始
     self.__manager = BookManager(identifier, title, contributor, series_title)
+
+    # Cover
+    coverImageFileName = self.createCoverImage(title, contributor, self.__createDate)
+    self.__manager.appendCover(coverImageFileName)
 
     # タイトルページ
     self.createTitlePage(self.ncode, title, contributor, self.__createDate)
@@ -447,6 +465,44 @@ class NarouToEpub3():
       page.appendBody(element)
 
     self.__manager.commitPage(page)
+
+  def createCoverImage(self, title, contributor, createDate):
+    colorNarou = (24, 183, 205) #18b7cd
+    colorWhite = (255, 255, 255)
+    colorGray = (235, 235, 235)
+
+    im = Image.new('RGB', (400, 600), colorNarou)
+    draw = ImageDraw.Draw(im)
+
+    fontname = r'C:\Windows\Fonts\msmincho.ttc'
+    fontTitle = ImageFont.truetype(fontname, 36)
+    fontContributor = ImageFont.truetype(fontname, 26)
+    fontCreateDate = ImageFont.truetype(fontname, 20)
+
+    draw.rectangle((10, 10, 390, 590), fill=colorWhite)
+    draw.rectangle((20, 20, 380, 580), fill=colorGray)
+
+    dt = DrawText(im, draw)
+    box = dt.drawHorizontal((35, 70), title, (0,0,0), fontTitle, DrawText.ALIGN_LEFT, 9)
+
+    #draw.rectangle((box[0]-10,box[1]-20,box[2]+10,box[3]+20), outline=colorNarou, width=3)
+    rightbottom_y = box[3]
+
+    y = rightbottom_y + 60
+    draw.line((35, y, 365, y), fill=colorNarou, width=4)
+
+    y += fontContributor.size
+    dt.drawHorizontal((200, y), contributor, (0,0,0), fontContributor, DrawText.ALIGN_CENTER, 12)
+
+    dateString = "EPUB更新日: " + createDate.strftime(r"%Y/%m/%d %H:%M:%S")
+    dt.drawHorizontal((200, 550), dateString, (0,0,0), fontCreateDate, DrawText.ALIGN_CENTER)
+
+    coverImageFileName = os.path.join(self.__downloadLocalBasePath, 'cover.png')
+    dirPath = os.path.dirname(coverImageFileName)
+    os.makedirs(dirPath, exist_ok=True)
+    im.save(coverImageFileName, quality=95)
+
+    return coverImageFileName
 
   def createTitlePage(self, ncode, title, contributor, createDate):
     page = PageObject(uid="title_page", file_name='title_page.xhtml', title="タイトルページ", lang='ja')
@@ -588,6 +644,66 @@ class DownloadManager():
     print("   -> Done : " + self.__localfullPathFileName)
     return self.__localfullPathFileName
 
+class DrawText():
+  ALIGN_LEFT = "left"
+  ALIGN_CENTER = "center"
+  ALIGN_RIGHT = "right"
+
+  # NOTE: 縦書きはLibraqmのインストールがめんどくさいので未実装
+  def __init__(self, im, draw):
+    self.im = im
+    self.draw = draw
+    im_width, im_height = im.size
+    self.canvas_width = im_width
+    self.canvas_height = im_height
+
+  def drawHorizontal(self, xy, text, color, font, align, wrap=None):
+    result_lefttop_x = self.canvas_width
+    result_lefttop_y = self.canvas_height
+    result_rightbottom_x = -1
+    result_rightbottom_y = -1
+
+    base_x = xy[0]
+    base_y = xy[1]
+    x = base_x
+    y = base_y
+
+    # wrapした後だと、size_heightが文字によって変化する為、あらかじめ全体の文字列で計算する。
+    spacing = int(font.size * 0.5)
+    #print(font.size)
+    #print(spacing)
+    height_spacing = self.draw.textsize(text, font)[1] + spacing
+
+    if wrap:
+      wrap_list = textwrap.wrap(text, wrap)
+    else:
+      wrap_list = [text]
+
+    for linetext in wrap_list:
+      size_width, size_height = self.draw.textsize(linetext, font)
+      #print("SIZE" + str(size_width) + " " + str(size_height))
+
+      if align == DrawText.ALIGN_LEFT:
+        pass
+      elif align == DrawText.ALIGN_CENTER:
+        x = base_x - (size_width / 2.0)
+      elif align == DrawText.ALIGN_RIGHT:
+        x = base_x - size_width
+
+      self.draw.text((x, y), linetext, fill=color, font=font)
+
+      if x < result_lefttop_x:
+        result_lefttop_x = x
+      if y < result_lefttop_y:
+        result_lefttop_y = y
+      if (x + size_width) > result_rightbottom_x:
+        result_rightbottom_x = x + size_width
+      if (y + size_height) > result_rightbottom_y:
+        result_rightbottom_y = y + size_height
+
+      y += height_spacing
+    return (result_lefttop_x, result_lefttop_y, result_rightbottom_x, result_rightbottom_y)
+
 if __name__ == '__main__':
     currentPath = os.path.dirname(os.path.abspath(__file__))
     os.chdir(currentPath)
@@ -602,7 +718,8 @@ if __name__ == '__main__':
     #ncodes.append("n4750dy")
     #ncodes.append("n4966ek")
     #ncodes.append("n4830bu")
-    ncodes.append("n7835cj")
+    #ncodes.append("n7835cj")
+    #ncodes.append("n7033br")
 
     if len(ncodes) == 0:
       args = parser.parse_args()
