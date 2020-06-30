@@ -232,7 +232,7 @@ class ImageObject():
     self.uid = r"image_" + str(subtitle_index) + r"_" + str(number).zfill(3)
     self.org_file_name = file_name
     self.file_name = self.__createResizeImage(self.org_file_name)
-    self.relativePath = r"images/" + os.path.basename(file_name)
+    self.relativePath = r"images/" + str(subtitle_index) + r"/" + os.path.basename(file_name)
 
   def __createResizeImage(self, srcFileName, resize_max_width=400):
     result = srcFileName
