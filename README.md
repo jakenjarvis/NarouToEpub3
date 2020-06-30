@@ -8,7 +8,7 @@
 Google Play Books(Androidアプリ)での表示確認を行っています。PC版は表示が崩れます。
 
 ## 動作環境
-python3、lxml、ebooklib、requests、ArgumentParser等。
+python3、lxml、ebooklib、requests、ArgumentParser、Pillow等。
 
 ## インストール方法
 誰か書いてくれると嬉しい。

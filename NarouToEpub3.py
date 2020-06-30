@@ -28,6 +28,9 @@ from collections import OrderedDict
 
 from ebooklib.utils import debug
 
+from PIL import Image, ImageDraw, ImageFont, ImageFilter
+import textwrap
+
 # https://qiita.com/YuukiMiyoshi/items/6ce77bf402a29a99f1bf
 ZEN = re.sub(r"[ａ-ｚＡ-Ｚ０-９]", r'', "".join(chr(0xff01 + i) for i in range(94)))
 HAN = re.sub(r"[a-zA-Z0-9]", r'', "".join(chr(0x21 + i) for i in range(94)))
@@ -227,8 +230,28 @@ class ImageObject():
   def __init__(self, subtitle_index, number, file_name=''):
     # epub.EpubItem() param
     self.uid = r"image_" + str(subtitle_index) + r"_" + str(number).zfill(3)
-    self.file_name = file_name
+    self.org_file_name = file_name
+    self.file_name = self.__createResizeImage(self.org_file_name)
     self.relativePath = r"images/" + os.path.basename(file_name)
+
+  def __createResizeImage(self, srcFileName, resize_max_width=400):
+    result = srcFileName
+
+    im = Image.open(srcFileName)
+    im_width, im_height = im.size
+
+    # 指定幅より大きい場合は、リサイズが必要
+    if im_width > resize_max_width:
+      filepath, ext = os.path.splitext(srcFileName)
+      dstFileName = filepath + "_w400" + ext
+
+      # リサイズ
+      resize_height = resize_max_width / im_width * im_height
+      im = im.resize((int(resize_max_width), int(resize_height)), Image.LANCZOS)
+      im.save(dstFileName)
+
+      result = dstFileName
+    return result
 
 class PageObject():
   def __init__(self, uid=None, file_name='', media_type='', content=None, title='', lang=None, direction=None, media_overlay=None, media_duration=None):
@@ -292,6 +315,7 @@ class BookManager():
     self.default_css = epub.EpubItem(uid="style", file_name="stylesheet.css", media_type="text/css", content=style)
     self.book.add_item(self.default_css)
 
+  def appendNavPage(self):
     # nav (auto generate)
     self.tocs.append('nav')
 
@@ -363,6 +387,8 @@ class NarouToEpub3():
     self.createTitlePage(self.ncode, title, contributor, self.__createDate)
     # あらすじ
     self.createArasujiPage(self.__scrapingNcode.novel_ex)
+
+    self.__manager.appendNavPage()
 
     # チャプター
     for item in self.__scrapingNcode.novel_chapters:
@@ -576,7 +602,7 @@ if __name__ == '__main__':
     #ncodes.append("n4750dy")
     #ncodes.append("n4966ek")
     #ncodes.append("n4830bu")
-    #ncodes.append("n7835cj")
+    ncodes.append("n7835cj")
 
     if len(ncodes) == 0:
       args = parser.parse_args()
