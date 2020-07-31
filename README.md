@@ -19,4 +19,4 @@ python3、lxml、ebooklib、requests、ArgumentParser、Pillow等。
 
 ## TODO
  - 章ページのローカル保存と、処理済み更新無し時の再利用処理。
- - 章の階層構造化。ebooklibでの実現方法が分からない。
+ - 章の階層構造化。ebooklibでの実現方法が分からない。(ebooklibを改変しないと無理っぽい？)
