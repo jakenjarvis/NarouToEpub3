@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #--------------------------------------------------
 # EPUB3になろう
@@ -38,9 +37,9 @@ ZEN2HAN = str.maketrans(ZEN, HAN)
 HAN2ZEN = str.maketrans(HAN, ZEN)
 
 def USER_AGENT():
-  return "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_6)" \
-        "AppleWebKit/537.36 (KHTML, like Gecko)" \
-        "Chrome/60.0.3112.113"
+  return "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " \
+        "AppleWebKit/537.36 (KHTML, like Gecko) " \
+        "Chrome/116.0.0.0 Safari/537.36 Edg/116.0.1938.62"
 
 def CLASS(*args): # class is a reserved word in Python
   return {"class":' '.join(args)}
@@ -153,12 +152,16 @@ class ScrapingNcode():
 
       self.novel_chapters.append(item)
 
+    counter = 0
     for item in self.novel_chapters:
+      counter += 1
       print(item)
       if item.isSubtitle():
         item.scrapingChapterItem = ScrapingChapterItem(item)
       # 連続アクセスの自制
-      time.sleep(0.6)
+      time.sleep(1.0)
+      if (counter % 10) == 0:
+        time.sleep(4.0)
 
 class ScrapingChapterItem():
   def __init__(self, chapterItem):
