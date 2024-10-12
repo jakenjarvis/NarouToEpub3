@@ -11,6 +11,7 @@ import sys
 import re
 import time
 import datetime
+import random
 
 from argparse import ArgumentParser
 import requests
@@ -39,7 +40,7 @@ HAN2ZEN = str.maketrans(HAN, ZEN)
 def USER_AGENT():
   return "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " \
         "AppleWebKit/537.36 (KHTML, like Gecko) " \
-        "Chrome/116.0.0.0 Safari/537.36 Edg/116.0.1938.62"
+        "Chrome/129.0.0.0 Safari/537.36 Edg/129.0.0.0"
 
 def CLASS(*args): # class is a reserved word in Python
   return {"class":' '.join(args)}
@@ -105,30 +106,46 @@ class ChapterItem():
   def isSubtitle(self):
     return self.__item_type == ChapterItem.D_ITEM_TYPE_SUBTITLE
 
+
+class NovelChapters():
+  def __init__(self):
+    self.__novel_chapters = []
+
+  def append(self, item):
+    self.__novel_chapters.append(item)
+
+  @property
+  def items(self):
+    return self.__novel_chapters
+
+
 class ScrapingNcode():
   def __init__(self, ncode):
     self.__ncode = ncode
-    self.url = r"https://ncode.syosetu.com/{0}/".format(self.__ncode)
+    self.__page = 1
+    self.__next = True
+
+    self.url = r"https://ncode.syosetu.com/{0}/?p={1}".format(self.__ncode, self.__page)
     print(self.url)
 
     response = requests.get(self.url, headers={"User-Agent": USER_AGENT()})
     self.__root = lxml.html.fromstring(response.content)
 
     self.series_title = ""
-    find_series_title_a = self.__root.xpath(r"//*[@class='series_title']/a")
+    find_series_title_a = self.__root.xpath(r"//*[@class='p-novel__series']/a")
     if len(find_series_title_a) >= 1:
-      self.series_title = str(self.__root.xpath(r"//*[@class='series_title']/a")[0].text)
+      self.series_title = str(self.__root.xpath(r"//*[@class='p-novel__series']/a")[0].text)
     print(self.series_title)
 
-    self.novel_title = str(self.__root.xpath(r"//p[@class='novel_title']")[0].text)
+    self.novel_title = str(self.__root.xpath(r"//h1[@class='p-novel__title']")[0].text)
     print(self.novel_title)
 
     self.novel_writername = ""
-    find_novel_writername_a = self.__root.xpath(r"//*[@class='novel_writername']/a")
+    find_novel_writername_a = self.__root.xpath(r"//*[@class='p-novel__author']/a")
     if len(find_novel_writername_a) >= 1:
-      self.novel_writername = str(self.__root.xpath(r"//*[@class='novel_writername']/a")[0].text)
+      self.novel_writername = str(self.__root.xpath(r"//*[@class='p-novel__author']/a")[0].text)
     else:
-      self.novel_writername = str(self.__root.xpath(r"//*[@class='novel_writername']")[0].text_content()).replace("作者：","")
+      self.novel_writername = str(self.__root.xpath(r"//*[@class='p-novel__author']")[0].text_content()).replace("作者：","")
     print(self.novel_writername)
 
     self.novel_ex = self.__root.xpath(r"//div[@id='novel_ex']")[0].text_content()
@@ -136,32 +153,52 @@ class ScrapingNcode():
     print(self.novel_ex)
     print("-----")
 
-    self.novel_chapters = []
-    for child in self.__root.xpath(r"//div[@class='index_box']/child::*"):
-      item = ChapterItem()
-      if 'chapter_title' in child.attrib.values():
-        chapter_title = str(child.text)
-        #print(chapter_title)
-        item.setChapter(chapter_title)
-      else:
-        subtitle = child.xpath(r"dd[@class='subtitle']/a")[0]
-        subtitle_text = str(subtitle.text)
-        subtitle_href = str(subtitle.attrib['href'])
-        #print(subtitle_href + " " + subtitle_text)
-        item.setSubtitle(subtitle_text, subtitle_href)
+    self.chapters = NovelChapters()
 
-      self.novel_chapters.append(item)
+    while self.__next:
+
+      for child in self.__root.xpath(r"//div[@class='p-eplist']/child::*"):
+        item = ChapterItem()
+        if 'p-eplist__chapter-title' in child.attrib.values():
+          chapter_title = str(child.text)
+          # print(chapter_title)
+          item.setChapter(chapter_title)
+        else:
+          subtitle = child.xpath(r"a[@class='p-eplist__subtitle']")[0]
+          subtitle_text = str(subtitle.text)
+          subtitle_href = str(subtitle.attrib['href'])
+          # print(subtitle_href + " " + subtitle_text)
+          item.setSubtitle(subtitle_text, subtitle_href)
+
+        self.chapters.append(item)
+
+      # リンク無しの「次へ」があるなら終了
+      next_page = self.__root.xpath(r"//span[contains(@class, 'c-pager__item--next')]")
+      if len(next_page) == 0:
+        self.__page += 1
+
+        self.url = r"https://ncode.syosetu.com/{0}/?p={1}".format(self.__ncode, self.__page)
+        print(self.url)
+
+        response = requests.get(self.url, headers={"User-Agent": USER_AGENT()})
+        self.__root = lxml.html.fromstring(response.content)
+        # 連続アクセスの自制
+        self.sleep()
+
+      else:
+        self.__next = False
 
     counter = 0
-    for item in self.novel_chapters:
+    for item in self.chapters.items:
       counter += 1
       print(item)
       if item.isSubtitle():
         item.scrapingChapterItem = ScrapingChapterItem(item)
       # 連続アクセスの自制
-      time.sleep(1.0)
-      if (counter % 10) == 0:
-        time.sleep(4.0)
+      self.sleep()
+
+  def sleep(self):
+    time.sleep(random.randint(2, 7))
 
 class ScrapingChapterItem():
   def __init__(self, chapterItem):
@@ -173,23 +210,23 @@ class ScrapingChapterItem():
 
     # 前書き
     self.novel_p = None
-    find_novel_p = self.__root.xpath(r"//div[@id='novel_p']")
+    find_novel_p = self.__root.xpath(r"//div[@class='p-novel__body']/child::div[contains(@class, 'p-novel__text--preface')]")
     if len(find_novel_p) >= 1:
       self.novel_p = find_novel_p[0].text_content()
 
     # 後書き
     self.novel_a = None
-    find_novel_a = self.__root.xpath(r"//div[@id='novel_a']")
+    find_novel_a = self.__root.xpath(r"//div[@class='p-novel__body']/child::div[contains(@class, 'p-novel__text--afterword')]")
     if len(find_novel_a) >= 1:
       self.novel_a = find_novel_a[0].text_content()
 
     # 本文
-    self.novel_h = None
-    find_novel_h = self.__root.xpath(r"//div[@id='novel_honbun']")
-    if len(find_novel_h) >= 1:
-      self.novel_h = find_novel_h[0].text_content()
+    # self.novel_h = None
+    # find_novel_h = self.__root.xpath(r"//div[@class='p-novel__body']")
+    # if len(find_novel_h) >= 1:
+    #   self.novel_h = find_novel_h[0].text_content()
 
-    self.novel_honbun = self.__root.xpath(r"//div[@id='novel_honbun']/child::p[contains(@id, 'L')]")
+    self.novel_honbun = self.__root.xpath(r"//div[@class='p-novel__body']/div/child::p[contains(@id, 'L1')]/parent::div/child::p[contains(@id, 'L')]")
 
 class TextFileManager():
   def __init__(self, fileName, defaultEncoding="utf-8", defaultErrors="strict"):
@@ -412,7 +449,7 @@ class NarouToEpub3():
     self.__manager.appendNavPage()
 
     # チャプター
-    for item in self.__scrapingNcode.novel_chapters:
+    for item in self.__scrapingNcode.chapters.items:
       print(item)
       if item.isSubtitle():
         # 前書き
@@ -420,7 +457,8 @@ class NarouToEpub3():
           self.createChapterPageWithText(item.subtitle_index, "p", item.subtitle_text + r"【前書き】", item.scrapingChapterItem.novel_p)
 
         # 本文
-        if item.scrapingChapterItem.novel_h:
+        # if item.scrapingChapterItem.novel_h:
+        if item.scrapingChapterItem.novel_honbun:
           #self.createChapterPageWithText(item.subtitle_index, "h", item.subtitle_text, item.scrapingChapterItem.novel_h)
           self.createChapterPageWithElements(item.subtitle_index, "h", item.subtitle_text, item.scrapingChapterItem.novel_honbun)
 
